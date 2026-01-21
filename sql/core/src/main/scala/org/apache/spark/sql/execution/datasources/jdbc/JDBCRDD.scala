@@ -59,7 +59,13 @@ object JDBCRDD extends Logging {
     val prepareQuery = options.prepareQuery
     val table = options.tableOrQuery
     val dialect = JdbcDialects.get(url)
-    getQueryOutputSchema(prepareQuery + dialect.getSchemaQuery(table), options, dialect)
+    val runQueryAsIs = options.parameters.getOrElse("runQueryAsIs", "false").toBoolean
+    val sqlText = if (runQueryAsIs) {
+      table
+    } else {
+      prepareQuery + dialect.getSchemaQuery(table)
+    }
+    getQueryOutputSchema(sqlText, options, dialect)
   }
 
   def getQueryOutputSchema(
@@ -277,7 +283,12 @@ class JDBCRDD(
       case None =>
     }
 
-    val sqlText = generateJdbcQuery(Some(part))
+    val runQueryAsIs = options.parameters.getOrElse("runQueryAsIs", "false").toBoolean
+    val sqlText = if (runQueryAsIs) {
+      s"${options.tableOrQuery}"
+    } else {
+      generateJdbcQuery(Some(part))
+    }
     stmt = conn.prepareStatement(sqlText,
         ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)
     stmt.setFetchSize(options.fetchSize)
