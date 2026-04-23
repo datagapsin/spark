@@ -59,9 +59,15 @@ object JDBCRDD extends Logging {
     val prepareQuery = options.prepareQuery
     val table = options.tableOrQuery
     val dialect = JdbcDialects.get(url)
-    val fullQuery = prepareQuery + dialect.getSchemaQuery(table)
+    var fullQuery = prepareQuery + dialect.getSchemaQuery(table)
 
     try {
+      val runQueryAsIs = options.parameters.getOrElse("runQueryAsIs", "false").toBoolean
+      fullQuery = if (runQueryAsIs) {
+        table
+      } else {
+        prepareQuery + dialect.getSchemaQuery(table)
+      }
       getQueryOutputSchema(fullQuery, options, dialect, conn)
     } catch {
       case e: SQLException if dialect.isSyntaxErrorBestEffort(e) =>
@@ -324,7 +330,12 @@ class JDBCRDD(
       case None =>
     }
 
-    val sqlText = generateJdbcQuery(Some(part))
+    val runQueryAsIs = options.parameters.getOrElse("runQueryAsIs", "false").toBoolean
+    val sqlText = if (runQueryAsIs) {
+      s"${options.tableOrQuery}"
+    } else {
+      generateJdbcQuery(Some(part))
+    }
     logInfo(log"Generated JDBC query to fetch data: ${MDC(SQL_TEXT, sqlText)}")
     stmt = conn.prepareStatement(sqlText,
         ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)
